@@ -8,7 +8,7 @@ class GameController: ObservableObject {
     private let hapticEngine = HapticEngine.shared
     private let storage      = UserDefaultsManager.shared
 
-    /// Records when the finger went DOWN on a button (single source of truth)
+    /// Single source of truth for when the finger went down
     private var tapStartTime: Date?
 
     init() {
@@ -29,7 +29,12 @@ class GameController: ObservableObject {
 
         guard let sequence = session.currentSequence else { return }
 
-        // Play the haptic sequence, then switch to input phase
+        // Trigger UI so "playingPattern" view shows immediately
+        DispatchQueue.main.async { [weak self] in
+            self?.objectWillChange.send()
+        }
+
+        // Play the haptic sequence, then hand control to the user
         hapticEngine.playSequence(sequence) { [weak self] in
             DispatchQueue.main.async {
                 self?.session.phase            = .waitingForInput
@@ -37,19 +42,14 @@ class GameController: ObservableObject {
                 self?.objectWillChange.send()
             }
         }
-
-        // Force UI refresh so the "playingPattern" view appears immediately
-        DispatchQueue.main.async { [weak self] in
-            self?.objectWillChange.send()
-        }
     }
 
-    // MARK: - Tap Handling (called by TapButton)
+    // MARK: - Tap Handling
 
     func onTapDown(type: HapticType) {
         guard session.phase == .waitingForInput else { return }
         tapStartTime = Date()
-        hapticEngine.playPattern(type)   // immediate feedback vibration
+        hapticEngine.playPattern(type)   // immediate vibration feedback
     }
 
     func onTapUp(type: HapticType) {
@@ -61,41 +61,49 @@ class GameController: ObservableObject {
 
         print("👆 \(type.rawValue) held \(String(format: "%.3f", held))s")
 
-        // Record the input
+        // Record what the user did
         session.recordInput(type: type, duration: held)
 
-        // Validate
+        // Score this single tap
         if session.validateLastInput() {
             print("✅ correct")
-            session.applyCorrect()
+            session.applyCorrect()   // +10, popup
+        } else {
+            print("❌ wrong")
+            hapticEngine.playError()
+            session.applyWrong()     // -5, popup, sets hadWrongTap flag
+        }
 
-            if session.isRoundComplete() {
-                // Whole round done correctly
-                session.phase = .correct
+        // After every tap, check if the round is now finished
+        if session.isRoundComplete() {
+            if session.hadWrongTap {
+                // Round done but at least one tap was wrong → game over
+                hapticEngine.playError()
+                persistHighScore()
+                session.phase = .gameOver
+            } else {
+                // Round done, all correct → celebrate
                 hapticEngine.playSuccess()
+                session.phase = .correct
 
                 if session.currentRound >= GameSession.maxRound {
-                    // 🏆 Beat the game
+                    // Beat the whole game
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
-                        self?.session.phase = .gameOver   // reuse gameOver screen; score will show
+                        self?.session.phase = .gameOver
                         self?.persistHighScore()
                     }
                 } else {
+                    // Next round after a short pause
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
                         self?.startNewRound()
                     }
                 }
             }
-            // else: more taps needed in this round, stay in waitingForInput
-        } else {
-            print("❌ wrong")
-            hapticEngine.playError()
-            session.applyWrong()       // sets phase = .gameOver
-            persistHighScore()
         }
+        // else: more taps still needed this round, stay in waitingForInput
     }
 
-    // MARK: - Persist
+    // MARK: - Persist high score
 
     private func persistHighScore() {
         if session.currentScore > storage.getHighScore() {
@@ -104,9 +112,11 @@ class GameController: ObservableObject {
         session.highScore = storage.getHighScore()
     }
 
-    // MARK: - Navigation helpers
+    // MARK: - Navigation
 
-    func restartGame() { startGame() }
+    func restartGame() {
+        startGame()
+    }
 
     func returnToMenu() {
         session.reset()
