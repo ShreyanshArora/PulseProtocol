@@ -7,31 +7,26 @@ enum HapticType: String, CaseIterable {
     case medium
     case long
 
-    // How long the device vibrates
+    // What the player FEELS
     var duration: TimeInterval {
         switch self {
-        case .short:  return 0.15
-        case .medium: return 0.4
+        case .short:  return 0.4
+        case .medium: return 0.6
         case .long:   return 0.8
         }
     }
 
-    // Target hold duration the user should match
+    // What the player must MATCH
     var targetPressDuration: TimeInterval {
-        switch self {
-        case .short:  return 0.2
-        case .medium: return 0.45
-        case .long:   return 0.85
-        }
+        duration
     }
 
-    // ± window around target that counts as correct
-    // Generous enough for real fingers on a real phone
+    // Precision windows
     var tolerance: TimeInterval {
         switch self {
-        case .short:  return 0.15   // accepts 0.05 – 0.35 s
-        case .medium: return 0.22   // accepts 0.23 – 0.67 s
-        case .long:   return 0.30   // accepts 0.55 – 1.15 s
+        case .short:  return 0.10   // 0.30 – 0.50
+        case .medium: return 0.10   // 0.50 – 0.70
+        case .long:   return 0.10   // 0.70 – 0.90
         }
     }
 
@@ -80,6 +75,30 @@ struct PatternMatcher {
         let target    = expected.targetPressDuration
         let tolerance = expected.tolerance
         return abs(duration - target) <= tolerance
+    }
+    static func score(userDuration: TimeInterval,
+                      expected: HapticType) -> Int? {
+
+        switch expected {
+
+        case .short:
+            if (0.38...0.42).contains(userDuration) { return 10 }
+            if (0.35...0.45).contains(userDuration) { return 8 }
+            if (0.30...0.50).contains(userDuration) { return 5 }
+            return nil
+
+        case .medium:
+            if (0.58...0.62).contains(userDuration) { return 10 }
+            if (0.55...0.65).contains(userDuration) { return 8 }
+            if (0.50...0.70).contains(userDuration) { return 5 }
+            return nil
+
+        case .long:
+            if (0.78...0.82).contains(userDuration) { return 10 }
+            if (0.75...0.85).contains(userDuration) { return 8 }
+            if (0.70...0.90).contains(userDuration) { return 5 }
+            return nil
+        }
     }
 
     static func accuracy(userDuration: TimeInterval, expected: HapticType) -> Double {

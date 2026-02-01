@@ -65,41 +65,44 @@ class GameController: ObservableObject {
         session.recordInput(type: type, duration: held)
 
         // Score this single tap
-        if session.validateLastInput() {
-            print("✅ correct")
-            session.applyCorrect()   // +10, popup
+        let index = session.userInputs.count - 1
+        let expected = session.currentSequence!.patterns[index]
+        let input = session.userInputs[index]
+
+        if let points = PatternMatcher.score(
+                userDuration: input.duration,
+                expected: expected
+        ) {
+            session.applyPoints(points)
         } else {
-            print("❌ wrong")
             hapticEngine.playError()
-            session.applyWrong()     // -5, popup, sets hadWrongTap flag
+            session.applyWrong()
         }
+
+
 
         // After every tap, check if the round is now finished
         if session.isRoundComplete() {
-            if session.hadWrongTap {
-                // Round done but at least one tap was wrong → game over
-                hapticEngine.playError()
-                persistHighScore()
-                session.phase = .gameOver
-            } else {
-                // Round done, all correct → celebrate
-                hapticEngine.playSuccess()
-                session.phase = .correct
 
-                if session.currentRound >= GameSession.maxRound {
-                    // Beat the whole game
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
-                        self?.session.phase = .gameOver
-                        self?.persistHighScore()
-                    }
-                } else {
-                    // Next round after a short pause
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-                        self?.startNewRound()
-                    }
+            // round finished — always move forward
+            hapticEngine.playSuccess()
+            session.phase = .correct
+
+            if session.currentRound >= GameSession.maxRound {
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+                    self?.persistHighScore()
+                    self?.session.phase = .gameOver
+                }
+
+            } else {
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                    self?.startNewRound()
                 }
             }
         }
+
         // else: more taps still needed this round, stay in waitingForInput
     }
 

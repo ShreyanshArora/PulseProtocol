@@ -38,7 +38,7 @@ class GameSession: ObservableObject {
     var lastInputTime    : Date? = nil
 
     // MARK: - Constants
-    static let maxRound      = 25
+    static let maxRound      = 5
     static let pointsCorrect =  10
     static let pointsWrong   =  -5
 
@@ -103,9 +103,16 @@ class GameSession: ObservableObject {
     }
 
     func applyWrong() {
-        currentScore = max(0, currentScore + GameSession.pointsWrong)
-        hadWrongTap  = true
-        triggerPopup(GameSession.pointsWrong)
+        currentScore = max(0, currentScore - 5)
+        triggerPopup(-5)
+    }
+
+    func applyPoints(_ points: Int) {
+        currentScore = max(0, currentScore + points)
+        if currentScore > highScore {
+            highScore = currentScore
+        }
+        triggerPopup(points)
     }
 
     private func triggerPopup(_ delta: Int) {
