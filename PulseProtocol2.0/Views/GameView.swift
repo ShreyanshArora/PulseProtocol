@@ -1,164 +1,125 @@
 import SwiftUI
 
+// MARK: - Game View
 struct GameView: View {
     @StateObject private var controller = GameController()
     @Environment(\.dismiss) private var dismiss
-    
+
     var body: some View {
         ZStack {
-            // Background gradient
+            // ── Background ──
             LinearGradient(
-                colors: [
-                    Color.black.opacity(0.15),
-                    Color.black.opacity(0.45)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-            
-            // Content based on game phase
+                colors: [Color.black.opacity(0.15), Color.black.opacity(0.45)],
+                startPoint: .top, endPoint: .bottom
+            ).ignoresSafeArea()
+
+            // ── Phase-based content ──
             VStack(spacing: 40) {
-                
-                // Debug indicator
-                Text("Phase: \(phaseDescription)")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.5))
-                
-                Group {
-                    if controller.session.phase == .menu {
-                        menuView
-                    } else if controller.session.phase == .playingPattern {
-                        listeningView
-                    } else if controller.session.phase == .waitingForInput {
-                        inputView
-                    } else if controller.session.phase == .correct {
-                        correctView
-                    } else if controller.session.phase == .gameOver {
-                        gameOverView
-                    } else {
-                        instructionsView
-                    }
+                switch controller.session.phase {
+                case .menu:           menuView
+                case .playingPattern: listeningView
+                case .waitingForInput: inputView
+                case .correct:        correctView
+                case .gameOver:       gameOverView
+                case .instructions:   instructionsView
                 }
             }
             .padding()
+
+            // ── Score popup overlay (floats on top of everything) ──
+            if let popup = controller.session.activePopup {
+                ScorePopupView(popup: popup)
+                    .transition(.asymmetric(
+                        insertion:  .move(edge: .bottom).combined(with: .opacity),
+                        removal:    .move(edge: .top).combined(with: .opacity)
+                    ))
+            }
         }
         .navigationBarBackButtonHidden(true)
-        .onAppear {
-            print("GameView appeared, phase: \(controller.session.phase)")
-        }
+        .animation(.easeOut(duration: 0.3), value: controller.session.activePopup?.id)
     }
-    
-    private var phaseDescription: String {
-        switch controller.session.phase {
-        case .menu: return "menu"
-        case .playingPattern: return "playingPattern"
-        case .waitingForInput: return "waitingForInput"
-        case .correct: return "correct"
-        case .gameOver: return "gameOver"
-        case .instructions: return "instructions"
-        }
-    }
-    
-    // MARK: - Menu View
+
+    // ──────────────────────────────────────────
+    // MARK: - Menu
+    // ──────────────────────────────────────────
     private var menuView: some View {
         VStack(spacing: 30) {
             Spacer()
-            
-            // Title
+
             Text("PulseProtocol")
                 .font(.system(size: 48, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
-            
             Text("Feel the Rhythm")
                 .font(.system(size: 20, weight: .medium, design: .rounded))
                 .foregroundColor(.white.opacity(0.7))
-            
+
             Spacer()
-            
-            // High Score
+
+            // High Score card
             VStack(spacing: 10) {
                 Text("HIGH SCORE")
                     .font(.system(size: 14, weight: .semibold, design: .monospaced))
                     .foregroundColor(.white.opacity(0.6))
-                
                 Text("\(controller.session.highScore)")
                     .font(.system(size: 36, weight: .bold, design: .monospaced))
                     .foregroundColor(.white)
             }
             .padding(20)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.white.opacity(0.1))
-            )
-            
+            .background(RoundedRectangle(cornerRadius: 20).fill(Color.white.opacity(0.1)))
+
             Spacer()
-            
-            // Start Button
-            Button(action: {
-                print("Start button tapped") // Debug
-                controller.startGame()
-                print("Game phase: \(controller.session.phase)") // Debug
-            }) {
+
+            Button(action: { controller.startGame() }) {
                 Text("START GAME")
                     .font(.system(size: 20, weight: .bold, design: .rounded))
                     .foregroundColor(.black)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 20)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.white)
-                    )
+                    .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
             }
             .padding(.horizontal)
-            
-            // Back to Main Menu
-            Button(action: {
-                dismiss()
-            }) {
+
+            Button(action: { dismiss() }) {
                 Text("BACK")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white.opacity(0.7))
             }
             .padding(.top, 10)
-            
+
             Spacer()
         }
     }
-    
-    // MARK: - Listening View
+
+    // ──────────────────────────────────────────
+    // MARK: - Listening (pattern playing)
+    // ──────────────────────────────────────────
     private var listeningView: some View {
         VStack(spacing: 40) {
             Spacer()
-            
-            // Pulsing Circle
-            Circle()
-                .fill(Color.white.opacity(0.3))
-                .frame(width: 150, height: 150)
-                .overlay(
-                    Circle()
-                        .stroke(Color.white, lineWidth: 3)
-                        .scaleEffect(1.5)
-                        .opacity(0)
-                        .animation(
-                            Animation.easeOut(duration: 1.0)
-                                .repeatForever(autoreverses: false),
-                            value: controller.session.phase
-                        )
-                )
-            
-            Text("Feel the Pattern...")
+
+            PulsingCircle()
+
+            Text("Feel the Pattern…")
                 .font(.system(size: 24, weight: .medium, design: .rounded))
                 .foregroundColor(.white)
-            
+
+            // Show how many taps are coming
+            if let seq = controller.session.currentSequence {
+                Text("\(seq.patterns.count) taps")
+                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                    .foregroundColor(.white.opacity(0.5))
+            }
+
             Spacer()
         }
     }
-    
-    // MARK: - Input View
+
+    // ──────────────────────────────────────────
+    // MARK: - Input
+    // ──────────────────────────────────────────
     private var inputView: some View {
-        VStack(spacing: 30) {
-            // Score Header
+        VStack(spacing: 24) {
+            // Score & Round header
             HStack {
                 VStack(alignment: .leading) {
                     Text("SCORE")
@@ -168,9 +129,7 @@ struct GameView: View {
                         .font(.system(size: 28, weight: .bold, design: .monospaced))
                         .foregroundColor(.white)
                 }
-                
                 Spacer()
-                
                 VStack(alignment: .trailing) {
                     Text("ROUND")
                         .font(.system(size: 12, weight: .semibold))
@@ -181,163 +140,200 @@ struct GameView: View {
                 }
             }
             .padding(.horizontal)
-            
-            Spacer()
-            
-            // Lives
-            HStack(spacing: 15) {
-                ForEach(0..<3) { index in
-                    Circle()
-                        .fill(index < controller.session.livesRemaining ? Color.white : Color.white.opacity(0.2))
-                        .frame(width: 12, height: 12)
-                }
-            }
-            
+
+            Spacer(minLength: 8)
+
             Text("Repeat the Pattern")
                 .font(.system(size: 20, weight: .medium, design: .rounded))
                 .foregroundColor(.white)
-            
-            // Pattern Progress
-            HStack(spacing: 8) {
-                if let sequence = controller.session.currentSequence {
-                    ForEach(0..<sequence.patterns.count, id: \.self) { index in
-                        Circle()
-                            .fill(index < controller.session.userInputs.count ? Color.green : Color.white.opacity(0.3))
-                            .frame(width: 10, height: 10)
-                    }
-                }
-            }
-            .padding(.bottom, 40)
-            
-            Spacer()
-            
-            // Input Buttons
-            HStack(spacing: 20) {
-                // Short Tap
-                TapButton(type: .short, label: "SHORT", controller: controller)
-                
-                // Medium Tap
-                TapButton(type: .medium, label: "MED", controller: controller)
-                
-                // Long Tap
-                TapButton(type: .long, label: "LONG", controller: controller)
+
+            // ── Pattern guide pills ──
+            PatternGuide(sequence:  controller.session.currentSequence,
+                         answered: controller.session.userInputs.count)
+
+            Spacer(minLength: 8)
+
+            // ── Tap Buttons ──
+            HStack(spacing: 14) {
+                TapButton(type: .short,  label: "SHORT", controller: controller)
+                TapButton(type: .medium, label: "MED",   controller: controller)
+                TapButton(type: .long,   label: "LONG",  controller: controller)
             }
             .padding(.horizontal)
-            
-            Spacer()
+
+            // Duration hint
+            Text("Tap & hold for the right duration")
+                .font(.system(size: 13, weight: .regular, design: .rounded))
+                .foregroundColor(.white.opacity(0.4))
+
+            Spacer(minLength: 16)
         }
     }
-    
-    // MARK: - Correct View
+
+    // ──────────────────────────────────────────
+    // MARK: - Correct
+    // ──────────────────────────────────────────
     private var correctView: some View {
         VStack {
             Spacer()
-            
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 80))
                 .foregroundColor(.green)
-            
-            Text("Perfect!")
-                .font(.system(size: 32, weight: .bold, design: .rounded))
+            Text("Round \(controller.session.currentRound) Complete!")
+                .font(.system(size: 28, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
-            
             Spacer()
         }
     }
-    
-    // MARK: - Game Over View
+
+    // ──────────────────────────────────────────
+    // MARK: - Game Over
+    // ──────────────────────────────────────────
     private var gameOverView: some View {
         VStack(spacing: 30) {
             Spacer()
-            
-            Text("Game Over")
+
+            let wonTheGame = controller.session.currentRound >= GameSession.maxRound
+
+            Text(wonTheGame ? "🏆 You Beat It!" : "Game Over")
                 .font(.system(size: 40, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
-            
-            VStack(spacing: 15) {
+
+            VStack(spacing: 12) {
                 Text("FINAL SCORE")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white.opacity(0.6))
-                
                 Text("\(controller.session.currentScore)")
                     .font(.system(size: 48, weight: .bold, design: .monospaced))
                     .foregroundColor(.white)
-                
-                if controller.session.currentScore == controller.session.highScore && controller.session.currentScore > 0 {
+
+                if controller.session.currentScore == controller.session.highScore
+                    && controller.session.currentScore > 0 {
                     Text("🏆 NEW HIGH SCORE!")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.yellow)
                 }
             }
             .padding(30)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.white.opacity(0.1))
-            )
-            
-            Text("Round: \(controller.session.currentRound)")
+            .background(RoundedRectangle(cornerRadius: 20).fill(Color.white.opacity(0.1)))
+
+            Text("Reached Round \(controller.session.currentRound)")
                 .font(.system(size: 18, weight: .medium))
                 .foregroundColor(.white.opacity(0.7))
-            
+
             Spacer()
-            
-            // Buttons
+
             VStack(spacing: 15) {
-                Button(action: {
-                    print("🔄 Restarting game...")
-                    controller.restartGame()
-                }) {
+                Button(action: { controller.restartGame() }) {
                     Text("PLAY AGAIN")
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.black)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 18)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color.white)
-                        )
+                        .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
                 }
-                
-                Button(action: {
-                    print("🏠 Returning to menu...")
-                    controller.returnToMenu()
-                }) {
+                Button(action: { controller.returnToMenu() }) {
                     Text("MENU")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(Color.white, lineWidth: 2)
-                        )
+                        .background(RoundedRectangle(cornerRadius: 16).stroke(Color.white, lineWidth: 2))
                 }
             }
             .padding(.horizontal)
-            
+
             Spacer()
         }
     }
-    
-    // MARK: - Instructions View
+
+    // ──────────────────────────────────────────
+    // MARK: - Instructions (placeholder)
+    // ──────────────────────────────────────────
     private var instructionsView: some View {
         VStack {
             Text("Instructions")
                 .font(.title)
-            // Add instructions here
+                .foregroundColor(.white)
         }
     }
 }
 
-// MARK: - Tap Button Component
+// ============================================================
+// MARK: - Pulsing Circle (listening animation)
+// ============================================================
+struct PulsingCircle: View {
+    @State private var pulse = false
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(Color.white.opacity(0.15))
+                .frame(width: 140, height: 140)
+
+            Circle()
+                .stroke(Color.white, lineWidth: 2)
+                .frame(width: 140, height: 140)
+                .scaleEffect(pulse ? 1.6 : 1.0)
+                .opacity(pulse ? 0.0 : 0.8)
+                .animation(.easeOut(duration: 1.2).repeatForever(autoreverses: false), value: pulse)
+        }
+        .onAppear { pulse = true }
+    }
+}
+
+// ============================================================
+// MARK: - Pattern Guide (pills showing the sequence)
+// ============================================================
+struct PatternGuide: View {
+    let sequence : HapticSequence?
+    let answered : Int          // how many the user has already tapped
+
+    var body: some View {
+        guard let seq = sequence else { return AnyView(EmptyView()) }
+
+        return AnyView(
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(0..<seq.patterns.count, id: \.self) { i in
+                        let pat   = seq.patterns[i]
+                        let done  = i < answered
+                        let next  = i == answered   // the one the user needs to tap now
+
+                        Text(pat.rawValue.uppercased())
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundColor(done ? .black : (next ? .black : .white))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(done  ? Color.green
+                                        : next  ? Color.white
+                                                : Color.white.opacity(0.15))
+                            )
+                            .overlay(
+                                next ? RoundedRectangle(cornerRadius: 20)
+                                    .stroke(Color.white, lineWidth: 2) : nil
+                            )
+                    }
+                }
+                .padding(.horizontal, 4)
+            }
+            .frame(height: 36)
+        )
+    }
+}
+
+// ============================================================
+// MARK: - Tap Button
+// ============================================================
 struct TapButton: View {
-    let type: HapticType
-    let label: String
-    let controller: GameController
-    
+    let type       : HapticType
+    let label      : String
+    let controller : GameController
+
     @State private var isPressed = false
-    @State private var pressStartTime: Date?
-    
+
     var body: some View {
         Text(label)
             .font(.system(size: 16, weight: .bold, design: .rounded))
@@ -346,30 +342,51 @@ struct TapButton: View {
             .frame(height: 80)
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white.opacity(isPressed ? 0.6 : 1.0))
+                    .fill(Color.white.opacity(isPressed ? 0.55 : 1.0))
             )
-            .scaleEffect(isPressed ? 0.95 : 1.0)
+            .scaleEffect(isPressed ? 0.93 : 1.0)
+            .animation(.easeOut(duration: 0.1), value: isPressed)
             .simultaneousGesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { _ in
-                        if !isPressed {
-                            isPressed = true
-                            pressStartTime = Date()
-                            controller.onTapDown(type: type)
-                            print("🔵 Button \(label) pressed")
-                        }
+                        guard !isPressed else { return }
+                        isPressed = true
+                        controller.onTapDown(type: type)
                     }
                     .onEnded { _ in
-                        if isPressed {
-                            isPressed = false
-                            controller.onTapUp(type: type)
-                            print("🔴 Button \(label) released")
-                        }
+                        guard isPressed else { return }
+                        isPressed = false
+                        controller.onTapUp(type: type)
                     }
             )
     }
 }
 
+// ============================================================
+// MARK: - Score Popup (+10 / -5 floating label)
+// ============================================================
+struct ScorePopupView: View {
+    let popup: ScorePopup
+    @State private var offset: CGFloat = 0
+    @State private var opacity: Double  = 1.0
+
+    var body: some View {
+        Text(popup.text)
+            .font(.system(size: 36, weight: .bold, design: .rounded))
+            .foregroundColor(popup.isPositive ? .green : .red)
+            .shadow(color: .black.opacity(0.4), radius: 6, x: 0, y: 2)
+            .offset(y: offset)
+            .opacity(opacity)
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.8)) {
+                    offset  = -120
+                    opacity =  0.0
+                }
+            }
+    }
+}
+
+// ============================================================
 #Preview {
     GameView()
 }

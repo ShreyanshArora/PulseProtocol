@@ -13,29 +13,41 @@ enum HapticType: String, CaseIterable {
     case short
     case medium
     case long
-    
+
+    // Duration the device vibrates for this pattern
     var duration: TimeInterval {
         switch self {
-        case .short: return 0.1
-        case .medium: return 0.3
-        case .long: return 0.6
+        case .short:  return 0.15   // ~150 ms burst
+        case .medium: return 0.4    // ~400 ms burst
+        case .long:   return 0.8    // ~800 ms burst
         }
     }
-    
-    var intensity: CGFloat {
+
+    // How long the USER should hold the button (target press duration)
+    // Slightly longer than haptic duration so it feels natural
+    var targetPressDuration: TimeInterval {
         switch self {
-        case .short: return 0.5
-        case .medium: return 0.7
-        case .long: return 1.0
+        case .short:  return 0.18
+        case .medium: return 0.45
+        case .long:   return 0.85
         }
     }
-    
-    // Tolerance for user input matching (in seconds)
+
+    // Acceptable window around the target press duration (±tolerance)
+    // These are generous so the game is actually playable
     var tolerance: TimeInterval {
         switch self {
-        case .short: return 0.08
-        case .medium: return 0.12
-        case .long: return 0.15
+        case .short:  return 0.15   // 0.03 – 0.33 s accepted
+        case .medium: return 0.22   // 0.23 – 0.67 s accepted
+        case .long:   return 0.30   // 0.55 – 1.15 s accepted
+        }
+    }
+
+    var intensity: CGFloat {
+        switch self {
+        case .short:  return 0.5
+        case .medium: return 0.7
+        case .long:   return 1.0
         }
     }
 }
@@ -44,17 +56,16 @@ enum HapticType: String, CaseIterable {
 struct HapticSequence {
     let patterns: [HapticType]
     let difficulty: Int
-    
-    // Generate random pattern based on difficulty
+
+    /// Round 1 → 3 patterns, Round 2 → 4, … Round 23 → 25 (capped)
     static func generate(difficulty: Int) -> HapticSequence {
-        let length = min(3 + difficulty, 10) // Start with 3, max 10
+        let length = min(difficulty + 2, 25)
         let patterns = (0..<length).map { _ in HapticType.allCases.randomElement()! }
         return HapticSequence(patterns: patterns, difficulty: difficulty)
     }
-    
-    // Total duration of the sequence
+
     var totalDuration: TimeInterval {
-        patterns.reduce(0) { $0 + $1.duration + 0.2 } // 0.2s gap between patterns
+        patterns.reduce(0.0) { $0 + $1.duration + 0.35 }
     }
 }
 
@@ -62,28 +73,29 @@ struct HapticSequence {
 struct UserInput {
     let type: HapticType
     let timestamp: TimeInterval
-    let duration: TimeInterval
+    let duration: TimeInterval   // how long the user actually held
 }
 
 // MARK: - Pattern Matching
 struct PatternMatcher {
-    
-    // Compare user input with expected pattern
-    static func matches(userInput: HapticType, expected: HapticType, duration: TimeInterval) -> Bool {
-        // Check if type matches
+
+    /// Returns true when the user pressed the correct button AND held it
+    /// within the acceptable tolerance window.
+    static func matches(userInput: HapticType,
+                        expected: HapticType,
+                        duration: TimeInterval) -> Bool {
         guard userInput == expected else { return false }
-        
-        // Check if duration is within tolerance
-        let expectedDuration = expected.duration
+
+        let target    = expected.targetPressDuration
         let tolerance = expected.tolerance
-        
-        return abs(duration - expectedDuration) <= tolerance
+        return abs(duration - target) <= tolerance
     }
-    
-    // Calculate timing accuracy (0.0 to 1.0)
+
+    /// 0.0 – 1.0 accuracy for scoring tweaks (not used in current simple +10/-5 model)
     static func accuracy(userDuration: TimeInterval, expected: HapticType) -> Double {
-        let diff = abs(userDuration - expected.duration)
+        let diff    = abs(userDuration - expected.targetPressDuration)
         let maxDiff = expected.tolerance
-        return max(0, 1.0 - (diff / maxDiff))
+        guard maxDiff > 0 else { return 1.0 }
+        return max(0.0, 1.0 - (diff / maxDiff))
     }
 }

@@ -4,56 +4,115 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Background
-                Image("bghex")
-                    .resizable()
-                    .scaledToFill()
-                    .ignoresSafeArea()
-                
-                // Depth overlay
+                // Background Gradient
                 LinearGradient(
-                    colors: [
-                        Color.black.opacity(0.15),
-                        Color.black.opacity(0.45)
-                    ],
+                    colors: [Color(hex: "0A0E27"), Color(hex: "1A1F3A")],
                     startPoint: .top,
                     endPoint: .bottom
                 )
                 .ignoresSafeArea()
                 
-                VStack {
-                    Spacer().frame(height: 140)
+                VStack(spacing: 50) {
+                    Spacer()
                     
-                    // Title Card
-                    ZStack {
-                        Image("Rectangle 104")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 340, height: 100)
-                            .shadow(color: .black.opacity(0.6), radius: 16, y: 10)
+                    // Logo & Title
+                    VStack(spacing: 20) {
+                        // Animated Pulse Icon
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    RadialGradient(
+                                        colors: [
+                                            Color(hex: "4FACFE").opacity(0.3),
+                                            Color.clear
+                                        ],
+                                        center: .center,
+                                        startRadius: 30,
+                                        endRadius: 80
+                                    )
+                                )
+                                .frame(width: 160, height: 160)
+                            
+                            Image(systemName: "waveform.circle.fill")
+                                .font(.system(size: 100))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [Color(hex: "4FACFE"), Color(hex: "00F2FE")],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .shadow(color: Color(hex: "4FACFE").opacity(0.5), radius: 20)
+                        }
                         
-                        Text("PulseProtocol")
-                            .font(.custom("Aclonica-Regular", size: 38))
-                            .foregroundColor(.white)
+                        VStack(spacing: 8) {
+                            Text("PulseProtocol")
+                                .font(.system(size: 44, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                            
+                            Text("Feel. Remember. Repeat.")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
                     }
                     
                     Spacer()
                     
-                    // Start Game Button
-                    NavigationLink(destination: GameView()) {
-                        Text("START GAME")
-                            .font(.system(size: 20, weight: .bold, design: .rounded))
-                            .foregroundColor(.black)
-                            .frame(width: 280, height: 60)
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color.white)
-                                    .shadow(color: .black.opacity(0.3), radius: 10, y: 5)
-                            )
+                    // Features
+                    VStack(spacing: 16) {
+                        FeatureRow(icon: "hand.tap.fill", text: "Tap-based gameplay")
+                        FeatureRow(icon: "brain.head.profile", text: "Test your memory")
+                        FeatureRow(icon: "chart.line.uptrend.xyaxis", text: "Beat your high score")
                     }
-                    .padding(.bottom, 100)
+                    .padding(.horizontal, 40)
+                    
+                    Spacer()
+                    
+                    // Start Button
+                    NavigationLink(destination: GameView()) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 20, weight: .bold))
+                            Text("START GAME")
+                                .font(.system(size: 20, weight: .bold, design: .rounded))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 22)
+                        .background(
+                            LinearGradient(
+                                colors: [Color(hex: "4FACFE"), Color(hex: "00F2FE")],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .cornerRadius(18)
+                        .shadow(color: Color(hex: "4FACFE").opacity(0.5), radius: 20, y: 10)
+                    }
+                    .padding(.horizontal, 40)
+                    .padding(.bottom, 50)
                 }
             }
+        }
+    }
+}
+
+struct FeatureRow: View {
+    let icon: String
+    let text: String
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .foregroundColor(Color(hex: "4FACFE"))
+                .frame(width: 24)
+            
+            Text(text)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(.white.opacity(0.8))
+            
+            Spacer()
         }
     }
 }

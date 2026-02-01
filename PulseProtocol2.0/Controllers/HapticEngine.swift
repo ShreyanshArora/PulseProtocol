@@ -11,105 +11,78 @@ import CoreHaptics
 // MARK: - Haptic Engine Controller
 class HapticEngine {
     static let shared = HapticEngine()
-    
-    private var engine: CHHapticEngine?
-    private var impactGenerator: UIImpactFeedbackGenerator?
-    
-    private init() {
-        setupHaptics()
-    }
-    
+
+    private var engine          : CHHapticEngine?
+    private var impactGenerator : UIImpactFeedbackGenerator?
+
+    private init() { setupHaptics() }
+
     // MARK: - Setup
     private func setupHaptics() {
         guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else {
-            print("Device doesn't support haptics")
+            print("⚠️ Device doesn't support haptics")
             return
         }
-        
         do {
             engine = try CHHapticEngine()
             try engine?.start()
-            
-            // Fallback impact generator
             impactGenerator = UIImpactFeedbackGenerator(style: .medium)
             impactGenerator?.prepare()
-            
         } catch {
-            print("Haptic engine failed to start: \(error)")
+            print("⚠️ Haptic engine start failed: \(error)")
         }
     }
-    
-    // MARK: - Play Single Pattern
+
+    // MARK: - Play a single pattern vibration
     func playPattern(_ type: HapticType) {
         guard let engine = engine else {
-            // Fallback to basic haptic
             impactGenerator?.impactOccurred(intensity: type.intensity)
             return
         }
-        
         do {
-            let intensity = CHHapticEventParameter(
-                parameterID: .hapticIntensity,
-                value: Float(type.intensity)
-            )
-            
-            let sharpness = CHHapticEventParameter(
-                parameterID: .hapticSharpness,
-                value: type == .short ? 1.0 : 0.5
-            )
-            
-            let event = CHHapticEvent(
-                eventType: .hapticContinuous,
-                parameters: [intensity, sharpness],
-                relativeTime: 0,
-                duration: type.duration
-            )
-            
+            let intensity = CHHapticEventParameter(parameterID: .hapticIntensity,
+                                                   value: Float(type.intensity))
+            let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness,
+                                                   value: type == .short ? 0.9 : 0.4)
+            let event = CHHapticEvent(eventType: .hapticContinuous,
+                                      parameters: [intensity, sharpness],
+                                      relativeTime: 0,
+                                      duration: type.duration)
             let pattern = try CHHapticPattern(events: [event], parameters: [])
-            let player = try engine.makePlayer(with: pattern)
+            let player  = try engine.makePlayer(with: pattern)
             try player.start(atTime: CHHapticTimeImmediate)
-            
         } catch {
-            print("Failed to play haptic: \(error)")
+            print("⚠️ playPattern failed: \(error)")
             impactGenerator?.impactOccurred(intensity: type.intensity)
         }
     }
-    
-    // MARK: - Play Sequence
+
+    // MARK: - Play full sequence then call completion
     func playSequence(_ sequence: HapticSequence, completion: @escaping () -> Void) {
-        var delay: TimeInterval = 0
-        
+        var delay: TimeInterval = 0.3   // short lead-in pause
+
         for pattern in sequence.patterns {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                 self?.playPattern(pattern)
             }
-            delay += pattern.duration + 0.2 // 200ms gap between patterns
+            delay += pattern.duration + 0.35   // pattern length + gap
         }
-        
-        // Notify completion
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay + 0.2) {
             completion()
         }
     }
-    
-    // MARK: - Feedback Haptics
+
+    // MARK: - Feedback
     func playSuccess() {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
-    
     func playError() {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.error)
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
     }
-    
     func playWarning() {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.warning)
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
     }
-    
-    // MARK: - Stop Engine
-    func stop() {
-        engine?.stop()
-    }
+
+    func stop() { engine?.stop() }
 }
