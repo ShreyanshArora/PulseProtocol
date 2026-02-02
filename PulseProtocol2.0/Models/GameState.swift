@@ -7,6 +7,7 @@ enum GamePhase: Equatable {
     case playingPattern    // Device is vibrating
     case waitingForInput   // User's turn to tap
     case correct           // User got it right
+    case bonusUnlocked     // Bonus round unlocked!
     case gameOver          // User failed
 }
 
@@ -30,7 +31,6 @@ class GameSession: ObservableObject {
     @Published var activePopup     : ScorePopup?    = nil
 
     /// True the moment any tap this round is wrong.
-    /// Checked at round end — if true → gameOver, else → next round.
     var hadWrongTap : Bool = false
 
     // Timing
@@ -38,7 +38,6 @@ class GameSession: ObservableObject {
     var lastInputTime    : Date? = nil
 
     // MARK: - Constants
-    static let maxRound      = 5
     static let pointsCorrect =  10
     static let pointsWrong   =  -5
 
@@ -61,7 +60,7 @@ class GameSession: ObservableObject {
         userInputs       = []
         hadWrongTap      = false
         phase            = .playingPattern
-        print("🎵 Round \(currentRound): \(currentSequence!.patterns.map { $0.rawValue })")
+        print("🎵 Round \(currentRound)\(currentSequence!.isBonus ? " 🎁 BONUS" : ""): \(currentSequence!.patterns.map { $0.rawValue })")
     }
 
     // MARK: - Input
@@ -93,6 +92,12 @@ class GameSession: ObservableObject {
     func isRoundComplete() -> Bool {
         guard let seq = currentSequence else { return false }
         return userInputs.count == seq.patterns.count
+    }
+    
+    // Check if this round unlocks a bonus
+    func shouldUnlockBonus() -> Bool {
+        // Bonus unlocks at round 5, and every round after if perfect
+        return currentRound == 5 || (currentRound >= 6 && currentSequence?.isBonus == true)
     }
 
     // MARK: - Score

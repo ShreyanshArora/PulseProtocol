@@ -1,8 +1,8 @@
 //
-//  UserDefaultManager.swift
+//  UserDefaultsManager.swift
 //  PulseProtocol2.0
 //
-//  Created by Shreyansh on 22/12/25.
+//  Updated by Claude on 02/02/26.
 //
 
 import Foundation
@@ -15,6 +15,7 @@ class UserDefaultsManager {
     private let highScoreKey = "PulseProtocol_HighScore"
     private let gamesPlayedKey = "PulseProtocol_GamesPlayed"
     private let totalPatternsKey = "PulseProtocol_TotalPatterns"
+    private let tutorialCompletedKey = "PulseProtocol_TutorialCompleted"
     
     private init() {}
     
@@ -28,6 +29,15 @@ class UserDefaultsManager {
     
     func getHighScore() -> Int {
         return defaults.integer(forKey: highScoreKey)
+    }
+    
+    // MARK: - Tutorial
+    func setTutorialCompleted(_ completed: Bool) {
+        defaults.set(completed, forKey: tutorialCompletedKey)
+    }
+    
+    func hasTutorialCompleted() -> Bool {
+        return defaults.bool(forKey: tutorialCompletedKey)
     }
     
     // MARK: - Stats
@@ -54,5 +64,6 @@ class UserDefaultsManager {
         defaults.removeObject(forKey: highScoreKey)
         defaults.removeObject(forKey: gamesPlayedKey)
         defaults.removeObject(forKey: totalPatternsKey)
+        defaults.removeObject(forKey: tutorialCompletedKey)
     }
 }

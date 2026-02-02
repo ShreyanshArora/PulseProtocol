@@ -18,181 +18,268 @@ struct InputView: View {
     @State private var feedbackText = ""
     @State private var feedbackColor: Color = .white
     @State private var showFeedback = false
+    @State private var isBonus = false
 
     var body: some View {
         ZStack {
-
-            // FULL SCREEN BACKGROUND
+            // Background
+            backgroundView
+            
+            // Main Content
+            VStack(spacing: 28) {
+                headerView
+                
+                if streak > 1 {
+                    streakView
+                }
+                
+                Spacer()
+                
+                if showFeedback {
+                    feedbackView
+                }
+                
+                Spacer()
+                
+                tapAreaView
+                    .padding(.bottom, 60)
+            }
+        }
+        .onChange(of: controller.session.activePopup?.id) {
+            handlePopupChange()
+        }
+        .onChange(of: controller.session.currentSequence?.isBonus) {
+            isBonus = controller.session.currentSequence?.isBonus ?? false
+        }
+        .onAppear {
+            isBonus = controller.session.currentSequence?.isBonus ?? false
+        }
+        .gesture(tapGesture)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+    }
+    
+    // MARK: - Background View
+    private var backgroundView: some View {
+        ZStack {
+            Image("bghex")
+                .resizable()
+                .scaledToFill()
+                .ignoresSafeArea()
+                .opacity(isBonus ? 0.5 : 0.3)
+            
             LinearGradient(
-                colors: [Color(hex: "0A0E27"), Color(hex: "1A1F3A")],
+                colors: isBonus
+                    ? [Color(hex: "1A0E27"), Color(hex: "2A1F3A")]
+                    : [Color(hex: "0A0E27"), Color(hex: "1A1F3A")],
                 startPoint: .top,
                 endPoint: .bottom
             )
+            .opacity(0.85)
             .ignoresSafeArea()
+        }
+    }
+    
+    // MARK: - Header View
+    private var headerView: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("SCORE")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.5))
+                Text("\(controller.session.currentScore)")
+                    .font(.system(size: 32, weight: .bold))
+                    .foregroundColor(.white)
+            }
 
-            VStack(spacing: 28) {
+            Spacer()
 
-                // HEADER
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("SCORE")
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.5))
-                        Text("\(controller.session.currentScore)")
-                            .font(.system(size: 32, weight: .bold))
-                            .foregroundColor(.white)
-                    }
-
-                    Spacer()
-
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text("ROUND")
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.5))
-                        Text("\(controller.session.currentRound)")
-                            .font(.system(size: 32, weight: .bold))
-                            .foregroundColor(.white)
-                    }
-                }
-                .padding(.horizontal, 28)
-                .padding(.top, 20)
-
-                // STREAK
-                if streak > 1 {
-                    Text("🔥 \(streak) STREAK")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.orange)
-                        .transition(.scale)
-                }
-
-                Spacer()
-
-                // CENTER FEEDBACK
-                if showFeedback {
-                    Text(feedbackText)
-                        .font(.system(size: 44, weight: .black, design: .rounded))
-                        .foregroundColor(feedbackColor)
-                        .transition(.scale.combined(with: .opacity))
-                }
-
-                Spacer()
-
-                // TAP AREA
-                ZStack {
-
-                    // GLOW
-                    Circle()
-                        .stroke(feedbackColor.opacity(isPressed ? 0.9 : 0.3),
-                                lineWidth: isPressed ? 10 : 3)
-                        .frame(width: 220, height: 220)
-                        .blur(radius: isPressed ? 12 : 0)
-                        .animation(.easeOut(duration: 0.2), value: isPressed)
-
-                    // BASE
-                    Circle()
-                        .fill(
+            VStack(alignment: .trailing, spacing: 4) {
+                if isBonus {
+                    Text("🎁 BONUS")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(
                             LinearGradient(
-                                colors: isPressed
-                                    ? [Color(hex: "4FACFE"), Color(hex: "00F2FE")]
-                                    : [Color(hex: "4FACFE").opacity(0.4),
-                                       Color(hex: "00F2FE").opacity(0.2)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                                colors: [Color.yellow, Color.orange],
+                                startPoint: .leading,
+                                endPoint: .trailing
                             )
                         )
-                        .frame(width: 190, height: 190)
-
-                    VStack(spacing: 10) {
-                        if isPressed {
-                            Text(String(format: "%.2fs", holdDuration))
-                                .font(.system(size: 34, weight: .bold, design: .monospaced))
-                                .foregroundColor(.white)
-
-                            Text("MATCH TIMING")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(.white.opacity(0.7))
-                        } else {
-                            Image(systemName: "hand.tap.fill")
-                                .font(.system(size: 42))
-                                .foregroundColor(.white.opacity(0.85))
-
-                            Text("PRESS & HOLD")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.white.opacity(0.6))
-                        }
-                    }
-                }
-                .padding(.bottom, 60)
-            }
-        }
-
-        // FEEDBACK DRIVER
-        .onChange(of: controller.session.activePopup?.id) { _ in
-            guard let popup = controller.session.activePopup else { return }
-
-            if popup.isPositive {
-                streak += 1
-
-                if popup.text.contains("10") {
-                    feedbackText = "PERFECT"
-                    feedbackColor = .green
-                } else if popup.text.contains("8") {
-                    feedbackText = "GREAT"
-                    feedbackColor = .blue
                 } else {
-                    feedbackText = "GOOD"
-                    feedbackColor = .yellow
+                    Text("ROUND")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.5))
                 }
-            } else {
-                streak = 0
-                feedbackText = "MISS"
-                feedbackColor = .red
-            }
-
-            showFeedback = true
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                showFeedback = false
+                Text("\(controller.session.currentRound)")
+                    .font(.system(size: 32, weight: .bold))
+                    .foregroundColor(isBonus ? .yellow : .white)
             }
         }
+        .padding(.horizontal, 28)
+        .padding(.top, 20)
+    }
+    
+    // MARK: - Streak View
+    private var streakView: some View {
+        Text("🔥 \(streak) STREAK")
+            .font(.system(size: 20, weight: .bold))
+            .foregroundColor(.orange)
+            .transition(.scale)
+    }
+    
+    // MARK: - Feedback View
+    private var feedbackView: some View {
+        Text(feedbackText)
+            .font(.system(size: 44, weight: .black, design: .rounded))
+            .foregroundColor(feedbackColor)
+            .transition(.scale.combined(with: .opacity))
+    }
+    
+    // MARK: - Tap Area View
+    private var tapAreaView: some View {
+        ZStack {
+            // GLOW
+            Circle()
+                .stroke(glowColor, lineWidth: isPressed ? 10 : 3)
+                .frame(width: 220, height: 220)
+                .blur(radius: isPressed ? 12 : 0)
+                .animation(.easeOut(duration: 0.2), value: isPressed)
 
-        // TOUCH HANDLING
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in
-                    if !isPressed && controller.session.phase == .waitingForInput {
-                        isPressed = true
-                        holdDuration = 0
+            // BASE
+            Circle()
+                .fill(baseGradient)
+                .frame(width: 190, height: 190)
 
-                        let index = controller.session.userInputs.count
-                        let expected = controller.session.currentSequence!.patterns[index]
+            tapContentView
+        }
+    }
+    
+    private var tapContentView: some View {
+        VStack(spacing: 10) {
+            if isPressed {
+                Text(String(format: "%.2fs", holdDuration))
+                    .font(.system(size: 34, weight: .bold, design: .monospaced))
+                    .foregroundColor(isBonus ? .black : .white)
 
-                        controller.onTapDown(type: expected)
+                Text("MATCH TIMING")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(isBonus ? .black.opacity(0.7) : .white.opacity(0.7))
+            } else {
+                Image(systemName: isBonus ? "star.fill" : "hand.tap.fill")
+                    .font(.system(size: 42))
+                    .foregroundColor(isBonus ? .black.opacity(0.85) : .white.opacity(0.85))
 
-                        timer = Timer.scheduledTimer(withTimeInterval: 0.01,
-                                                     repeats: true) { _ in
-                            holdDuration += 0.01
-                        }
-                    }
-                }
-                .onEnded { _ in
-                    if isPressed {
-                        isPressed = false
-                        timer?.invalidate()
-                        timer = nil
+                Text("PRESS & HOLD")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(isBonus ? .black.opacity(0.6) : .white.opacity(0.6))
+            }
+        }
+    }
+    
+    // MARK: - Computed Styles
+    private var glowColor: AnyShapeStyle {
+        if isBonus {
+            return AnyShapeStyle(LinearGradient(
+                colors: [Color.yellow, Color.orange],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ).opacity(isPressed ? 0.9 : 0.3))
+        } else {
+            return AnyShapeStyle(feedbackColor.opacity(isPressed ? 0.9 : 0.3))
+        }
+    }
+    
+    private var baseGradient: LinearGradient {
+        if isBonus {
+            return LinearGradient(
+                colors: isPressed
+                    ? [Color.yellow, Color.orange]
+                    : [Color.yellow.opacity(0.4), Color.orange.opacity(0.2)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        } else {
+            return LinearGradient(
+                colors: isPressed
+                    ? [Color(hex: "4FACFE"), Color(hex: "00F2FE")]
+                    : [Color(hex: "4FACFE").opacity(0.4), Color(hex: "00F2FE").opacity(0.2)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
+    
+    // MARK: - Gesture
+    private var tapGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { _ in
+                handleTapDown()
+            }
+            .onEnded { _ in
+                handleTapUp()
+            }
+    }
+    
+    // MARK: - Handlers
+    private func handlePopupChange() {
+        guard let popup = controller.session.activePopup else { return }
 
-                        let index = controller.session.userInputs.count
-                        let expected = controller.session.currentSequence!.patterns[index]
+        if popup.isPositive {
+            streak += 1
 
-                        controller.onTapUp(type: expected)
+            if popup.text.contains("10") {
+                feedbackText = "PERFECT"
+                feedbackColor = isBonus ? .yellow : .green
+            } else if popup.text.contains("8") {
+                feedbackText = "GREAT"
+                feedbackColor = isBonus ? .orange : .blue
+            } else {
+                feedbackText = "GOOD"
+                feedbackColor = .yellow
+            }
+        } else {
+            streak = 0
+            feedbackText = "MISS"
+            feedbackColor = .red
+        }
 
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                            holdDuration = 0
-                        }
-                    }
-                }
-        )
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+        showFeedback = true
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            showFeedback = false
+        }
+    }
+    
+    private func handleTapDown() {
+        if !isPressed && controller.session.phase == .waitingForInput {
+            isPressed = true
+            holdDuration = 0
+
+            let index = controller.session.userInputs.count
+            let expected = controller.session.currentSequence!.patterns[index]
+
+            controller.onTapDown(type: expected)
+
+            timer = Timer.scheduledTimer(withTimeInterval: 0.01, repeats: true) { _ in
+                holdDuration += 0.01
+            }
+        }
+    }
+    
+    private func handleTapUp() {
+        if isPressed {
+            isPressed = false
+            timer?.invalidate()
+            timer = nil
+
+            let index = controller.session.userInputs.count
+            let expected = controller.session.currentSequence!.patterns[index]
+
+            controller.onTapUp(type: expected)
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                holdDuration = 0
+            }
+        }
     }
 }
 

@@ -43,12 +43,34 @@ enum HapticType: String, CaseIterable {
 struct HapticSequence {
     let patterns   : [HapticType]
     let difficulty : Int
+    let isBonus    : Bool
 
-    // Round 1 → 3 patterns, Round 2 → 4, … capped at 25
+    // Progressive difficulty: Round 1→2, R2-4→3, R5→4, R6→5, R7→6, etc.
     static func generate(difficulty: Int) -> HapticSequence {
-        let length   = min(difficulty + 2, 25)
+        let length: Int
+        let isBonus: Bool
+        
+        switch difficulty {
+        case 1:
+            length = 2
+            isBonus = false
+        case 2...4:
+            length = 3
+            isBonus = false
+        case 5:
+            length = 4
+            isBonus = false
+        case 6...10:
+            // Bonus rounds: 5, 6, 7, 8, 9, 10 haptics
+            length = difficulty - 1
+            isBonus = true
+        default:
+            length = min(difficulty + 1, 25)
+            isBonus = true
+        }
+        
         let patterns = (0..<length).map { _ in HapticType.allCases.randomElement()! }
-        return HapticSequence(patterns: patterns, difficulty: difficulty)
+        return HapticSequence(patterns: patterns, difficulty: difficulty, isBonus: isBonus)
     }
 
     var totalDuration: TimeInterval {

@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct ContentView: View {
+    @State private var showTutorial = false
+    @State private var navigateToGame = false
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -68,8 +71,14 @@ struct ContentView: View {
                     
                     Spacer()
                     
-                    // Start Button
-                    NavigationLink(destination: GameView()) {
+                    // Start Button - checks if tutorial is needed
+                    Button(action: {
+                        if UserDefaultsManager.shared.hasTutorialCompleted() {
+                            navigateToGame = true
+                        } else {
+                            showTutorial = true
+                        }
+                    }) {
                         HStack(spacing: 12) {
                             Image(systemName: "play.fill")
                                 .font(.system(size: 20, weight: .bold))
@@ -90,8 +99,31 @@ struct ContentView: View {
                         .shadow(color: Color(hex: "4FACFE").opacity(0.5), radius: 20, y: 10)
                     }
                     .padding(.horizontal, 40)
-                    .padding(.bottom, 50)
+                    
+                    // Optional: Show tutorial again button if already completed
+                    if UserDefaultsManager.shared.hasTutorialCompleted() {
+                        Button(action: {
+                            showTutorial = true
+                        }) {
+                            Text("REPLAY TUTORIAL")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                    }
+                    
+                    Spacer()
+                        .frame(height: 50)
                 }
+            }
+            .navigationDestination(isPresented: $showTutorial) {
+                TutorialView(onComplete: {
+                    UserDefaultsManager.shared.setTutorialCompleted(true)
+                    showTutorial = false
+                    navigateToGame = true
+                })
+            }
+            .navigationDestination(isPresented: $navigateToGame) {
+                GameView()
             }
         }
     }

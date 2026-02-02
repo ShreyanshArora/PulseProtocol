@@ -7,12 +7,22 @@ struct GameView: View {
 
     var body: some View {
         ZStack {
-            // Background
-            LinearGradient(
-                colors: [Color.black.opacity(0.15), Color.black.opacity(0.45)],
-                startPoint: .top,
-                endPoint: .bottom
-            ).ignoresSafeArea()
+            // Background with hex pattern
+            ZStack {
+                Image("bghex")
+                    .resizable()
+                    .scaledToFill()
+                    .ignoresSafeArea()
+                    .opacity(0.3)
+                
+                LinearGradient(
+                    colors: [Color(hex: "0A0E27"), Color(hex: "1A1F3A")],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .opacity(0.85)
+                .ignoresSafeArea()
+            }
 
             // Phase-based content
             VStack(spacing: 40) {
@@ -21,6 +31,7 @@ struct GameView: View {
                 case .playingPattern:  listeningView
                 case .waitingForInput: InputView(controller: controller)
                 case .correct:         correctView
+                case .bonusUnlocked:   bonusUnlockedView
                 case .gameOver:        gameOverView
                 case .instructions:    instructionsView
                 }
@@ -101,23 +112,49 @@ struct GameView: View {
         VStack(spacing: 40) {
             Spacer()
 
-            PulsingCircle()
-
-            Text("Feel the Pattern…")
-                .font(.system(size: 24, weight: .medium, design: .rounded))
-                .foregroundColor(.white)
+            if let seq = controller.session.currentSequence, seq.isBonus {
+                BonusPulsingCircle()
+            } else {
+                PulsingCircle()
+            }
 
             if let seq = controller.session.currentSequence {
-                Text("\(seq.patterns.count) taps coming")
-                    .font(.system(size: 15, weight: .medium, design: .rounded))
-                    .foregroundColor(.white.opacity(0.45))
+                if seq.isBonus {
+                    VStack(spacing: 12) {
+                        Text("🎁 BONUS ROUND \(controller.session.currentRound) 🎁")
+                            .font(.system(size: 26, weight: .bold, design: .rounded))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color.yellow, Color.orange],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                        
+                        Text("Feel the Pattern…")
+                            .font(.system(size: 20, weight: .medium, design: .rounded))
+                            .foregroundColor(.white)
+                        
+                        Text("\(seq.patterns.count) taps coming")
+                            .font(.system(size: 15, weight: .medium, design: .rounded))
+                            .foregroundColor(.yellow.opacity(0.7))
+                    }
+                } else {
+                    VStack(spacing: 12) {
+                        Text("Feel the Pattern…")
+                            .font(.system(size: 24, weight: .medium, design: .rounded))
+                            .foregroundColor(.white)
+                        
+                        Text("\(seq.patterns.count) taps coming")
+                            .font(.system(size: 15, weight: .medium, design: .rounded))
+                            .foregroundColor(.white.opacity(0.45))
+                    }
+                }
             }
 
             Spacer()
         }
     }
-
-
 
     // ─────────────────────────────────────
     // MARK: - Correct
@@ -130,10 +167,76 @@ struct GameView: View {
                 .font(.system(size: 80))
                 .foregroundColor(.green)
 
-            Text("Round \(controller.session.currentRound) Complete!")
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
+            if let seq = controller.session.currentSequence, seq.isBonus {
+                Text("Bonus Round \(controller.session.currentRound) Complete!")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color.yellow, Color.orange],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+            } else {
+                Text("Round \(controller.session.currentRound) Complete!")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+            }
 
+            Spacer()
+        }
+    }
+    
+    // ─────────────────────────────────────
+    // MARK: - Bonus Unlocked
+    // ─────────────────────────────────────
+    private var bonusUnlockedView: some View {
+        VStack(spacing: 30) {
+            Spacer()
+            
+            // Animated star
+            ZStack {
+                ForEach(0..<3, id: \.self) { index in
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 100))
+                        .foregroundColor(.yellow)
+                        .opacity(0.6)
+                        .scaleEffect(1.5)
+                        .rotationEffect(.degrees(Double(index) * 120))
+                }
+                
+                Image(systemName: "star.circle.fill")
+                    .font(.system(size: 120))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color.yellow, Color.orange],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .shadow(color: .yellow, radius: 30)
+            }
+            
+            VStack(spacing: 16) {
+                Text("🎊 BONUS UNLOCKED! 🎊")
+                    .font(.system(size: 36, weight: .black, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color.yellow, Color.orange, Color.yellow],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                
+                Text("Perfect Round!")
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                
+                Text("Get ready for the challenge...")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            
             Spacer()
         }
     }
@@ -145,11 +248,23 @@ struct GameView: View {
         VStack(spacing: 30) {
             Spacer()
 
-            let wonTheGame = controller.session.currentRound >= GameSession.maxRound
+            let reachedBonus = controller.session.currentRound >= 6
 
-            Text(wonTheGame ? "🏆 You Beat It!" : "Game Over")
-                .font(.system(size: 40, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
+            if reachedBonus {
+                Text("🏆 Amazing Run! 🏆")
+                    .font(.system(size: 40, weight: .bold, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color.yellow, Color.orange],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+            } else {
+                Text("Game Over")
+                    .font(.system(size: 40, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+            }
 
             VStack(spacing: 15) {
                 Text("FINAL SCORE")
@@ -170,9 +285,21 @@ struct GameView: View {
             .padding(30)
             .background(RoundedRectangle(cornerRadius: 20).fill(Color.white.opacity(0.1)))
 
-            Text("Reached Round \(controller.session.currentRound)")
-                .font(.system(size: 18, weight: .medium))
-                .foregroundColor(.white.opacity(0.7))
+            if reachedBonus {
+                Text("Reached Bonus Round \(controller.session.currentRound)!")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color.yellow, Color.orange],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+            } else {
+                Text("Reached Round \(controller.session.currentRound)")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
+            }
 
             Spacer()
 
@@ -236,6 +363,71 @@ struct PulsingCircle: View {
                 )
         }
         .onAppear { animating = true }
+    }
+}
+
+// ═══════════════════════════════════════════
+// MARK: - Bonus Pulsing Circle
+// ═══════════════════════════════════════════
+struct BonusPulsingCircle: View {
+    @State private var animating = false
+    @State private var rotating = false
+
+    var body: some View {
+        ZStack {
+            // Multiple pulse rings for bonus effect
+            ForEach(0..<3, id: \.self) { index in
+                Circle()
+                    .stroke(
+                        LinearGradient(
+                            colors: [Color.yellow, Color.orange],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 3
+                    )
+                    .frame(width: 140, height: 140)
+                    .scaleEffect(animating ? 1.7 + CGFloat(index) * 0.3 : 1.0)
+                    .opacity(animating ? 0.0 : 0.8)
+                    .animation(
+                        .easeOut(duration: 1.2)
+                        .repeatForever(autoreverses: false)
+                        .delay(Double(index) * 0.2),
+                        value: animating
+                    )
+            }
+            
+            // Center filled circle with stars
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color.yellow.opacity(0.6),
+                                Color.orange.opacity(0.3)
+                            ],
+                            center: .center,
+                            startRadius: 20,
+                            endRadius: 70
+                        )
+                    )
+                    .frame(width: 140, height: 140)
+                
+                Image(systemName: "sparkles")
+                    .font(.system(size: 50))
+                    .foregroundColor(.white)
+                    .rotationEffect(.degrees(rotating ? 360 : 0))
+                    .animation(
+                        .linear(duration: 3)
+                        .repeatForever(autoreverses: false),
+                        value: rotating
+                    )
+            }
+        }
+        .onAppear {
+            animating = true
+            rotating = true
+        }
     }
 }
 

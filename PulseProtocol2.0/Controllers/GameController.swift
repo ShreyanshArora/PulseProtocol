@@ -10,6 +10,9 @@ class GameController: ObservableObject {
 
     /// Single source of truth for when the finger went down
     private var tapStartTime: Date?
+    
+    /// Track if current round was perfect (all taps correct)
+    private var roundPerfect: Bool = true
 
     init() {
         session.highScore = storage.getHighScore()
@@ -25,6 +28,7 @@ class GameController: ObservableObject {
     }
 
     func startNewRound() {
+        roundPerfect = true  // Reset perfect tracker
         session.startNewRound()
 
         guard let sequence = session.currentSequence else { return }
@@ -75,35 +79,53 @@ class GameController: ObservableObject {
         ) {
             session.applyPoints(points)
         } else {
+            roundPerfect = false
             hapticEngine.playError()
             session.applyWrong()
         }
 
-
-
         // After every tap, check if the round is now finished
         if session.isRoundComplete() {
-
-            // round finished — always move forward
-            hapticEngine.playSuccess()
-            session.phase = .correct
-
-            if session.currentRound >= GameSession.maxRound {
-
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
-                    self?.persistHighScore()
-                    self?.session.phase = .gameOver
-                }
-
-            } else {
-
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-                    self?.startNewRound()
-                }
-            }
+            handleRoundComplete()
         }
 
         // else: more taps still needed this round, stay in waitingForInput
+    }
+    
+    // MARK: - Round Completion Logic
+    private func handleRoundComplete() {
+        // Round finished
+        hapticEngine.playSuccess()
+        session.phase = .correct
+        
+        // Check if we should unlock bonus
+        if roundPerfect && session.shouldUnlockBonus() {
+            // Show bonus unlock animation
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+                self?.session.phase = .bonusUnlocked
+                
+                // Then proceed to next round after showing bonus message
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                    self?.startNewRound()
+                }
+            }
+        } else if roundPerfect && session.currentRound >= 6 {
+            // Continue bonus rounds if perfect
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.startNewRound()
+            }
+        } else if !roundPerfect && session.currentRound >= 6 {
+            // Failed during bonus rounds - game over
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+                self?.persistHighScore()
+                self?.session.phase = .gameOver
+            }
+        } else {
+            // Normal progression
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.startNewRound()
+            }
+        }
     }
 
     // MARK: - Persist high score
